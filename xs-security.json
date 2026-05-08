@@ -1,0 +1,17 @@
+{
+  "xsappname": "nexus-bridge",
+  "tenant-mode": "dedicated",
+  "scopes": [
+    {
+      "name": "$XSAPPNAME.User",
+      "description": "Call the Nexus license service"
+    }
+  ],
+  "role-templates": [
+    {
+      "name": "NexusLicenseUser",
+      "description": "Grants access to the Nexus license hash API",
+      "scope-references": [ "$XSAPPNAME.User" ]
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "name": "nexus-bridge",
+  "version": "1.0.0",
+  "description": "SAP BTP ↔ Nexus license-hash integration service",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start":     "cds-serve",
+    "watch":     "cds watch",
+    "build:mta": "mbt build -p cf"
+  },
+  "dependencies": {
+    "@sap/cds":                    "^8",
+    "@sap/xssec":                  "^4",
+    "@sap-cloud-sdk/http-client":  "^3",
+    "@sap-cloud-sdk/connectivity": "^3"
+  },
+  "devDependencies": {
+    "@sap/cds-dk": "^8"
+  },
+  "cds": {
+    "requires": {
+      "auth": "xsuaa",
+      "[development]": {
+        "auth": "mocked",
+        "POSTBACK_BASE": "http://localhost:4004"
+      }
+    }
+  }
+}
+
