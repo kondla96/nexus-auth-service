@@ -20,14 +20,20 @@ modules:
       # CF auto-sets this to the deployed app's route URL (no trailing slash).
       # Nexus will POST the hash to <POSTBACK_BASE>/nexus/callback?n=<nonce>.
       POSTBACK_BASE: ${default-url}
-      # TODO (fill in after confirming with Ben/Nexus team):
-      #   ABC_EGRESS_IPS  — comma-separated list of Nexus outbound IP addresses
-      #   ABC_SIG_HEADER  — HTTP header Nexus uses for the HMAC signature
       ABC_EGRESS_IPS: ""
       ABC_SIG_HEADER: "x-nexus-signature"
-      # POSTBACK_SECRET is NOT set here. It is injected at runtime from
-      # BTP Credential Store or via: cf set-env nexus-srv POSTBACK_SECRET "<value>"
-      # Setting it here would overwrite the live value on every deploy.
+      # Nexus principal-propagation destination → BTP Destination "nexusPrincipalProp"
+      #   Authentication:     OAuth2SAMLBearerAssertion
+      #   URL:                https://license.nexusic.com/LicenseManager/LicenseServer.dll
+      #   Client Key:         61ea160a-f883-43c5-837e-6fa2a50dcbfb
+      #   Token Service URL:  https://login.microsoftonline.com/44d0ecc3-.../oauth2/v2.0/token
+      #   Token Service User: 61ea160a-f883-43c5-837e-6fa2a50dcbfb
+      #   Token Service Pass: <Nexus app client secret>
+      #   URL.queries.id:     <nexus_id>
+      #   URL.queries.app:    <nexus_app>
+      #   URL.queries.type:   Portal Application
+      #   URL.queries.env:    Production
+      #   nameIdFormat:       urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress
     requires:
       - name: nexus-uaa
       - name: nexus-destination
@@ -54,20 +60,9 @@ resources:
     parameters:
       service-name: comnexusasset-xsuaa-service
 
-  # ── Destination service — hosts the AbcLicenseServer destination ───────────
-  # The AbcLicenseServer destination (OAuth2SAMLBearerAssertion) performs the
-  # SAML→Graph token exchange automatically. Configure it in BTP Cockpit:
-  #   Authentication:     OAuth2SAMLBearerAssertion
-  #   Client Key:         App #2 Client ID  (3fa48b0f-9684-40c9-9173-b9acddc83291)
-  #   Token Service URL:  https://login.microsoftonline.com/<TENANT_ID>/oauth2/v2.0/token
-  #   Token Service User: App #2 Client ID
-  #   Token Service Pass: App #2 Client Secret
-  #   scope:              https://graph.microsoft.com/.default
-  #   audience:           https://login.microsoftonline.com/<TENANT_ID>/
-  #   URL.queries.id:     D1A460B9-1863-49FB-A70E-7674ADD5FB5B
-  #   URL.queries.app:    AF90DA92-483C-4973-A75C-F51562589A48
-  #   URL.queries.type:   Portal Application
-  #   URL.queries.env:    Production
+  # ── Destination service — hosts the nexusPrincipalProp destination ────────
+  # Configure "nexusPrincipalProp" in BTP Cockpit → Connectivity → Destinations.
+  # See properties block above for required fields.
   - name: nexus-destination
     type: org.cloudfoundry.managed-service
     parameters:

@@ -22,6 +22,9 @@
   "cds": {
     "requires": {
       "auth": "xsuaa",
+      "ThirdPartyAppService": { 
+        "kind": "rest", 
+        "credentials": { "destination": "nexusPrincipalProp" }},
       "[development]": {
         "auth": "mocked",
         "POSTBACK_BASE": "http://localhost:4004"

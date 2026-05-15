@@ -23,15 +23,25 @@ service LicenseService {
    * Initiates a Nexus license-hash request.
    * Returns a nonce immediately. Poll result(nonce) for the hash.
    */
-  action requestHash() returns { nonce : String };
+  action requestHash() returns {
+    nonce       : String;
+    nexusStatus : String;  // 'ok' | Nexus error message (e.g. postBack URL not registered)
+  };
 
   /**
    * Poll for the result of a previous requestHash call.
    * status: 'pending' | 'complete' | 'expired'
-   * hash is populated only when status = 'complete'.
+   * Fields are populated only when status = 'complete'.
+   *   token       — the license token to present to Nexus APIs
+   *   userId      — Nexus user ID
+   *   restEndPoint — Nexus REST endpoint (e.g. trial.nexusic.com)
+   *   jwt         — JWT returned by Nexus for further API calls
    */
   function result(nonce : String) returns {
-    status : String;
-    hash   : String;
+    status       : String;
+    token        : String;
+    userId       : Integer;
+    restEndPoint : String;
+    jwt          : String;
   };
 }

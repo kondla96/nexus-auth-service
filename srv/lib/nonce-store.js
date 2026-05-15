@@ -29,7 +29,10 @@ const TTL_MS = 5 * 60 * 1000; // 5 minutes
  *   user:      string,
  *   createdAt: number,
  *   status:    'pending' | 'complete',
- *   hash:      string
+ *   token:     string,
+ *   userId:    number|null,
+ *   restEndPoint: string,
+ *   jwt:       string
  * }>}
  */
 const store = new Map();
@@ -41,32 +44,69 @@ const store = new Map();
  */
 function create(user) {
   const nonce = crypto.randomBytes(24).toString("base64url");
-  store.set(nonce, { user, createdAt: Date.now(), status: "pending", hash: "" });
+  store.set(nonce, { user, createdAt: Date.now(), status: "pending", token: "", userId: null, restEndPoint: "", jwt: "" });
   return nonce;
 }
 
 /**
- * Mark a nonce as complete with the received hash.
+ * Mark a nonce as complete with the Nexus callback payload.
  * Returns true on success, false if nonce not found or expired.
  * @param {string} nonce
- * @param {string} hash
+ * @param {{ token: string, userId?: number, restEndPoint?: string, jwt?: string }} nexusData
  * @returns {boolean}
  */
-function complete(nonce, hash) {
+function complete(nonce, nexusData) {
   const entry = store.get(nonce);
   if (!entry || Date.now() - entry.createdAt > TTL_MS) {
     store.delete(nonce);
     return false;
   }
-  entry.hash = hash;
+  entry.token       = nexusData.token       || "";
+  entry.userId      = nexusData.userId      ?? null;
+  entry.restEndPoint = nexusData.restEndPoint || "";
+  entry.jwt         = nexusData.jwt         || "";
   entry.status = "complete";
   return true;
 }
 
 /**
+ * Mark a nonce as complete by user identity (for when Nexus strips the nonce
+ * from the postBack URL and we must correlate via the JWT in the callback body).
+ * Matches the oldest pending nonce for the given user (case-insensitive).
+ * Returns the matched nonce string on success, null if not found.
+ * @param {string} user  — XSUAA / UPN user identifier
+ * @param {{ token: string, userId?: number, restEndPoint?: string, jwt?: string }} nexusData
+ * @returns {string|null}
+ */
+function completeByUser(user, nexusData) {
+  const normalizedUser = (user || "").toLowerCase();
+  let   oldest         = null;
+  let   oldestNonce    = null;
+
+  for (const [nonce, entry] of store.entries()) {
+    if (entry.status !== "pending") continue;
+    if (entry.user.toLowerCase() !== normalizedUser) continue;
+    if (Date.now() - entry.createdAt > TTL_MS) { store.delete(nonce); continue; }
+    if (!oldest || entry.createdAt < oldest.createdAt) {
+      oldest      = entry;
+      oldestNonce = nonce;
+    }
+  }
+
+  if (!oldest) return null;
+
+  oldest.token       = nexusData.token       || "";
+  oldest.userId      = nexusData.userId      ?? null;
+  oldest.restEndPoint = nexusData.restEndPoint || "";
+  oldest.jwt         = nexusData.jwt         || "";
+  oldest.status      = "complete";
+  return oldestNonce;
+}
+
+/**
  * Retrieve a nonce entry, or null if not found / expired.
  * @param {string} nonce
- * @returns {{ user: string, status: string, hash: string } | null}
+ * @returns {{ user: string, status: string, token: string, userId: number|null, restEndPoint: string, jwt: string } | null}
  */
 function get(nonce) {
   const entry = store.get(nonce);
@@ -87,4 +127,5 @@ setInterval(() => {
   }
 }, 60_000).unref();
 
-module.exports = { create, complete, get };
+module.exports = { create, complete, completeByUser, get };
+

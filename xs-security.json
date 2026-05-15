@@ -1,6 +1,17 @@
 {
   "xsappname": "nexus-bridge",
   "tenant-mode": "dedicated",
+  "oauth2-configuration": {
+    "grant-types": [
+      "authorization_code",
+      "client_credentials",
+      "password",
+      "refresh_token",
+      "urn:ietf:params:oauth:grant-type:saml2-bearer",
+      "user_token"
+    ],
+    "redirect-uris": ["https://oauth.pstmn.io/v1/callback"]
+  },
   "scopes": [
     {
       "name": "$XSAPPNAME.User",
