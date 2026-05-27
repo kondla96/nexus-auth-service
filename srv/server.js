@@ -1,19 +1,17 @@
 "use strict";
 
 /**
- * Custom Express bootstrap hooks for the CAP server.
+ * Custom Express bootstrap for the CAP server.
  *
- * Registers two things before CDS takes over:
+ * Registers public routes before CDS takes over:
  *
- *   1. Raw body capture middleware for POST /nexus/callback
- *      The HMAC-SHA256 signature in callback-service.js must be computed
- *      against the EXACT bytes Nexus sent. Express/CAP body parsers consume
- *      the stream and JSON-parse the body — after that the original bytes are
- *      gone. We capture them here, before any parsing, and attach them as
- *      req.rawBody so callback-service.js can use them.
+ *   1. POST /nexus/callback — receives the Nexus license token delivery.
+ *      Registered here (before CDS) so it is fully public; no XSUAA auth required.
+ *      Correlates the callback to the waiting user via the JWT in the POST body.
  *
- *   2. GET /nexus/health — public liveness probe (no auth required).
- *      Used by BTP health checks and monitoring.
+ *   2. GET /nexus/callback — probe response (Nexus validates the URL is reachable).
+ *
+ *   3. GET /nexus/health — public liveness probe (no auth required).
  */
 
 const cds = require("@sap/cds");
@@ -38,13 +36,10 @@ cds.on("bootstrap", (app) => {
   app.get("/nexus/callback/:nonce", (_req, res) => res.status(200).end());
 
   // ── POST /nexus/callback — Nexus token delivery ───────────────────────────
-  // Nexus ALWAYS calls back to /nexus/callback — it strips everything after
-  // the base path (query strings AND path segments) from the postBack URL.
-  //
-  // Correlation strategy: the callback body includes a `jwt` field which is
-  // the Graph token (Token B) we passed to Nexus during requestHash. We decode
-  // the JWT payload (no signature verification needed) to extract the user's
-  // UPN, then match it to the oldest pending nonce for that user.
+  // Nexus POSTs { token, userId, restEndPoint, jwt } to this endpoint.
+  // Correlation: we decode the jwt field (no signature verify — already
+  // validated by Nexus) to extract the user email, then match it to the
+  // oldest pending nonce for that user in the nonce-store.
   function handleCallbackPost(req, res) {
     const chunks = [];
     req.on("data",  chunk => chunks.push(chunk));
@@ -77,8 +72,8 @@ cds.on("bootstrap", (app) => {
 
       const matchedNonce = nonceStore.completeByUser(user, parsed);
       if (!matchedNonce) {
-        log.warn("Callback: no pending nonce found for user", { user });
-        return res.status(404).json({ error: "no pending session for user" });
+        log.warn("Callback: token received but no pending nonce for user (expired or direct call)", { user });
+        return res.status(200).json({ status: "ok" });
       }
 
       log.info("Callback: token stored successfully", { user, nonce: matchedNonce });
