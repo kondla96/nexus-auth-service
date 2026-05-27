@@ -1,22 +1,16 @@
 "use strict";
 
-const cds        = require("@sap/cds");
-const nonceStore = require("./lib/nonce-store");
+const cds                  = require("@sap/cds");
+const { executeHttpRequest } = require("@sap-cloud-sdk/http-client");
+const { getDestination }   = require("@sap-cloud-sdk/connectivity");
+const nonceStore           = require("./lib/nonce-store");
 
 const log = cds.log("license");
 
 module.exports = cds.service.impl(async function () {
 
-  // Connect to Nexus via the BTP Destination "nexusPrincipalProp".
-  // Authentication type OAuth2SAMLBearerAssertion on that destination means BTP
-  // automatically builds a SAML assertion from the logged-in user's XSUAA token,
-  // exchanges it with Azure AD, and injects the resulting delegated Entra Bearer
-  // token into every outbound request — no MSAL, no manual token exchange needed.
-  const nexusService = await cds.connect.to("ThirdPartyAppService");
-
-  // requestHash — creates a nonce, calls Nexus /requestHash (user identity
-  // propagated automatically by the destination), returns the nonce immediately.
-  // Nexus POSTs the hash asynchronously to POST /nexus/callback/:nonce.
+  // requestHash — creates a nonce, calls Nexus /requestHash, returns the nonce
+  // immediately. Nexus POSTs the hash asynchronously to POST /nexus/callback.
   this.on("requestHash", async (req) => {
     const userId = req.user.id;
 
@@ -29,21 +23,32 @@ module.exports = cds.service.impl(async function () {
     const base = (process.env.POSTBACK_BASE || "").replace(/\/$/, "");
     const postbackUrl = base + "/nexus/callback/" + encodeURIComponent(nonce);
 
-    // 3. Call Nexus via BTP Destination (token exchange is automatic).
-    //    Destination URL.queries.* additional properties (id, app, type, env)
-    //    are appended by BTP to every request — only postBack is dynamic.
+    // 3. Call Nexus via BTP Destination "nexusPrincipalProp" (NoAuthentication).
+    //    executeHttpRequest is used instead of cds remote-service send() because
+    //    it reliably forwards custom headers. The XSUAA Bearer token is passed
+    //    so Nexus can validate the user identity directly.
+    //    Destination URL.queries.* (id, app, type, env) are appended automatically.
+    const authHeader = req.http.req.headers["authorization"];
+
     let nexusStatus = "ok";
     try {
-      await nexusService.tx(req).send(
-        "POST",
-        "/requestHash?postBack=" + encodeURIComponent(postbackUrl),
-        ""
-      );
+      const dest = await getDestination({ destinationName: "nexusPrincipalProp" });
+      await executeHttpRequest(dest, {
+        method:  "POST",
+        url:     "/requestHash",
+        params:  { postBack: postbackUrl },
+        headers: { Authorization: authHeader },
+        data:    "",
+      });
       log.info("requestHash dispatched to Nexus", { userId, nonce });
     } catch (err) {
-      nexusStatus = err.rootCause?.message || err.message;
+      const nexusBody = err.response?.data ?? err.cause?.response?.data ?? null;
+      nexusStatus = err.message;
       log.error("Nexus requestHash call failed (nonce still active)", {
-        userId, nonce, message: err.message,
+        userId, nonce,
+        httpStatus:   err.response?.status ?? err.cause?.response?.status,
+        nexusBody,
+        message:      err.message,
       });
     }
 

@@ -22,18 +22,13 @@ modules:
       POSTBACK_BASE: ${default-url}
       ABC_EGRESS_IPS: ""
       ABC_SIG_HEADER: "x-nexus-signature"
-      # Nexus principal-propagation destination → BTP Destination "nexusPrincipalProp"
-      #   Authentication:     OAuth2SAMLBearerAssertion
+      # Nexus destination → BTP Destination "nexusPrincipalProp"
+      #   Authentication:     NoAuthentication  (XSUAA JWT forwarded by backend code)
       #   URL:                https://license.nexusic.com/LicenseManager/LicenseServer.dll
-      #   Client Key:         61ea160a-f883-43c5-837e-6fa2a50dcbfb
-      #   Token Service URL:  https://login.microsoftonline.com/44d0ecc3-.../oauth2/v2.0/token
-      #   Token Service User: 61ea160a-f883-43c5-837e-6fa2a50dcbfb
-      #   Token Service Pass: <Nexus app client secret>
       #   URL.queries.id:     <nexus_id>
       #   URL.queries.app:    <nexus_app>
       #   URL.queries.type:   Portal Application
       #   URL.queries.env:    Production
-      #   nameIdFormat:       urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress
     requires:
       - name: nexus-uaa
       - name: nexus-destination

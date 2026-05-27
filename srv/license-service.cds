@@ -4,16 +4,13 @@
  * Requires an authenticated user (XSUAA JWT validated by @sap/xssec via CAP).
  *
  * Flow:
- *   1. requestHash() — client calls this; service generates a nonce, calls
- *      Nexus via the AbcLicenseServer BTP destination (which performs the
- *      OAuth2SAMLBearerAssertion exchange and injects a Graph token), then
- *      returns the nonce immediately.
+ *   1. requestHash() — client calls this; service creates a nonce, calls
+ *      Nexus /requestHash via BTP Destination "nexusPrincipalProp", forwarding
+ *      the user's XSUAA Bearer token. Returns the nonce immediately.
  *
  *   2. result(nonce) — client polls this every ~1.5 s until status='complete'.
- *      When Nexus POSTs the hash to POST /nexus/callback?n=<nonce>, the
- *      nonce-store is updated and the next poll returns the hash.
- *
- * No token-exchange code here — all handled by BTP Destination service.
+ *      When Nexus POSTs the token to POST /nexus/callback, the nonce-store is
+ *      updated and the next poll returns the token.
  */
 @path: '/api/license'
 @requires: 'authenticated-user'
